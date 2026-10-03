@@ -333,10 +333,9 @@ function spawnEnemy(type){
     if (Math.random() < mp){
       e.mount = true;
       e.rider = ['m5','m2','m4'][randi(0, 2)];
-      const riderCfg = { m5:{hp:3.2}, m2:{hp:3.5}, m4:{hp:3.8} }[e.rider];
-      e.hp *= riderCfg.hp; e.maxHp = e.hp;
-      e.dmg *= 1.3;
-      e.spd = t.spd + ENEMY_TYPES[e.rider].spd;   // 骑手与坐骑速度叠加
+      e.hp *= 2; e.maxHp = e.hp;   // 血量翻倍
+      e.dmg *= 2;                  // 伤害翻倍
+      e.spd *= 2;                  // 速度翻倍
       if (e.rider === 'm4'){ e.kind = 'dash'; e.dashCD = 1.5; }   // 柴犬骑手：黄狗学会冲刺
       if (e.rider === 'm2'){ e.riderSpit = true; }                // 大眼骑手：骑在背上远程吐球
     } else if (Math.random() < .3){
@@ -348,7 +347,8 @@ function spawnEnemy(type){
   if (type === 'doge' && wave >= 7 && Math.random() < .18){
     // 美团专送·双人套餐：柴犬蛙背着大眼怪，边冲边吐
     e.mount = true; e.rider = 'm2'; e.riderSpit = true;
-    e.hp *= 2.5; e.maxHp = e.hp;
+    e.hp *= 2; e.maxHp = e.hp;
+    e.dmg *= 2; e.spd *= 2;
   }
   // ---- 金色精英（12 波起）：又肉又痛，评分翻倍 ----
   if (!e.isBoss && wave >= 12 && Math.random() < .08){
