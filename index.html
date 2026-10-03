@@ -271,7 +271,6 @@ const cam = { x: 0 };
 let masks = [], pendingMask = null;         // 眼罩拾取物
 let maskWave = 0;                           // 眼罩窗口所在波数（0 = 窗口关闭）
 let fleeTimer = 0, fleeCD = 0, maskDropT = 0;
-let bossFrame = 0;                          // BOSS 战屏幕收缩程度 0~1
 
 const hero = {};
 let enemies = [], projectiles = [], particles = [], dmgTexts = [], ghosts = [], pendingSpawns = [];
@@ -636,7 +635,6 @@ function newGame(){
   resetHero();
   enemies = []; projectiles = []; particles = []; dmgTexts = []; ghosts = []; pendingSpawns = [];
   masks = []; pendingMask = null; maskWave = 0; fleeTimer = 0; fleeCD = 0; maskDropT = 0;
-  bossFrame = 0;
   cam.x = hero.x - W/2;
   wave = 0; kills = 0; score = 0; combo = 0; comboTimer = 0;
   bufferedDir = 0; bufferT = 0; pointerHeld = false;
@@ -1039,10 +1037,6 @@ function update(dt){
   }
   enemies = enemies.filter(e => e.alpha > 0);
 
-  // BOSS 在场时屏幕收缩（打完自动恢复）
-  const bossAlive = enemies.some(e => e.isBoss && !e.dying && e.hp > 0);
-  bossFrame += ((bossAlive ? 1 : 0) - bossFrame) * Math.min(1, dt * 3);
-
   // ---- 逃跑检测 + 眼罩奇遇 ----
   fleeCD = Math.max(0, fleeCD - dt);
   const walkingAway = walkDir !== 0 && nearestD > 320;
@@ -1211,29 +1205,20 @@ function render(){
 
   g.restore();   // ---- 世界坐标层结束 ----
 
-  // BOSS 战：四周黑幕收缩 + 屏幕正中心上方大血条
-  if (bossFrame > 0.01){
-    const b = bossFrame;
-    const th = 82 * b, sw = 46 * b;
-    g.fillStyle = `rgba(8,5,3,${.85 * b})`;
-    g.fillRect(0, 0, W, th); g.fillRect(0, H - th, W, th);
-    g.fillRect(0, 0, sw, H); g.fillRect(W - sw, 0, sw, H);
-    g.strokeStyle = `rgba(200,40,30,${.55 * b})`; g.lineWidth = 3;
-    g.strokeRect(sw, th, W - 2 * sw, H - 2 * th);
-    const bosses = enemies.filter(e => e.isBoss && !e.dying && e.hp > 0).slice(0, 2);
-    if (bosses.length){
-      bosses.forEach((bb, i) => {
-        const bw2 = 340, bx2 = (W - bw2) / 2, by2 = th + 14 + i * 30;
-        g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(bx2 - 3, by2 - 3, bw2 + 6, 24);
-        g.fillStyle = '#2a0d0b'; g.fillRect(bx2, by2, bw2, 18);
-        const pg = g.createLinearGradient(bx2, 0, bx2 + bw2, 0);
-        pg.addColorStop(0, '#a01015'); pg.addColorStop(1, '#ff4a3a');
-        g.fillStyle = pg;
-        g.fillRect(bx2, by2, bw2 * Math.max(0, bb.hp / bb.maxHp), 18);
-        g.fillStyle = '#ffd865'; g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
-        g.fillText(bosses.length > 1 ? `巨蛙 BOSS · ${i === 0 ? '壹' : '贰'}` : '巨蛙 BOSS', W / 2, by2 + 14);
-      });
-    }
+  // BOSS 大血条（屏幕正中心上方，双 BOSS 双条）
+  const bosses = enemies.filter(e => e.isBoss && !e.dying && e.hp > 0).slice(0, 2);
+  if (bosses.length){
+    bosses.forEach((bb, i) => {
+      const bw2 = 340, bx2 = (W - bw2) / 2, by2 = 14 + i * 30;
+      g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(bx2 - 3, by2 - 3, bw2 + 6, 24);
+      g.fillStyle = '#2a0d0b'; g.fillRect(bx2, by2, bw2, 18);
+      const pg = g.createLinearGradient(bx2, 0, bx2 + bw2, 0);
+      pg.addColorStop(0, '#a01015'); pg.addColorStop(1, '#ff4a3a');
+      g.fillStyle = pg;
+      g.fillRect(bx2, by2, bw2 * Math.max(0, bb.hp / bb.maxHp), 18);
+      g.fillStyle = '#ffd865'; g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
+      g.fillText(bosses.length > 1 ? `巨蛙 BOSS · ${i === 0 ? '壹' : '贰'}` : '巨蛙 BOSS', W / 2, by2 + 14);
+    });
   }
 
   drawHUD();
