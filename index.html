@@ -53,16 +53,30 @@
   .stats { margin-top:24px; font-size:17px; line-height:2.1; color:#e8dcbc; }
   .stats b { color:#f5c542; font-size:20px; }
   .best { margin-top:10px; font-size:14px; color:#a89a78; }
+
+  /* 加载进度条 */
+  .lbar { width:260px; height:14px; border:1px solid #6b5426; border-radius:8px;
+    overflow:hidden; margin-top:20px; background:#241a0e; }
+  #lfill { height:100%; width:0%; background:linear-gradient(90deg,#f0a92c,#ffd865);
+    transition:width .25s; border-radius:8px; }
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="cv" width="480" height="854"></canvas>
 
+  <!-- 加载界面：等待全部素材加载完成 -->
+  <div id="loading" class="overlay">
+    <div class="title" style="font-size:36px;">凡蛙修仙传</div>
+    <div class="subtitle">正在加载修仙素材… <span id="loadPct">0%</span></div>
+    <div class="lbar"><div id="lfill"></div></div>
+    <div class="hint">首次加载较慢，请稍候</div>
+  </div>
+
   <!-- 开始菜单 -->
-  <div id="menu" class="overlay">
-    <div class="title">我功夫特牛</div>
-    <div class="subtitle">— 网页复刻版 · 素材版 —</div>
+  <div id="menu" class="overlay hidden">
+    <div class="title">凡蛙修仙传</div>
+    <div class="subtitle">— 网页复刻版 —</div>
     <div class="hint">
       点击屏幕<b style="color:#f5c542">左 / 右</b>侧出招（或按 ← → / A D），<b style="color:#f5c542">按住不放可跑路</b><br>
       三段连招自动循环：男＝手刀→头锤→冲膝 / 女＝回旋踢→高踢→扫堂腿<br>
@@ -151,10 +165,32 @@ const rand  = (a,b)=>a+Math.random()*(b-a);
 const randi = (a,b)=>Math.floor(rand(a,b+1));
 
 // ================= 素材加载 =================
+// 加载进度：图片 + 语音全部就绪（或失败兜底）才显示主菜单，避免 GitHub 上资源半路加载不出来
+let LOAD_DONE = 0, LOAD_TOTAL = 0, assetsReadyFlag = false;
+function loadTick(){
+  LOAD_DONE++;
+  const pct = Math.min(100, Math.round(LOAD_DONE / LOAD_TOTAL * 100));
+  const f = document.getElementById('lfill'), p = document.getElementById('loadPct');
+  if (f) f.style.width = pct + '%';
+  if (p) p.textContent = pct + '%';
+  if (LOAD_DONE >= LOAD_TOTAL) assetsReady();
+}
+function assetsReady(){
+  if (assetsReadyFlag) return;
+  assetsReadyFlag = true;
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+}
+
 const IMG = {};
 for (const k of ['heroM','heroF','heroEvo','m1','m2','m3','m4','m5','m6','m7','mask']){
   IMG[k] = new Image();
   IMG[k].src = `assets/${k}.png`;
+}
+LOAD_TOTAL = 11;                                  // 图片数
+for (const k in IMG){
+  IMG[k].addEventListener('load', loadTick);
+  IMG[k].addEventListener('error', loadTick);     // 单个加载失败不卡进度
 }
 
 // ================= 音效（WebAudio 合成） =================
@@ -193,6 +229,12 @@ const SFX_MAP = {
 const SFX_AUDIO = {};
 for (const k of ['hurt','die1','die2','die3','clear1','clear2','clear3','death','dieEarly','flee','card','pick1','pick2','pick3'])
   SFX_AUDIO[k] = new Audio('assets/sfx/' + k + '.mp3');
+LOAD_TOTAL += 14;                                 // 语音数
+for (const k in SFX_AUDIO){
+  SFX_AUDIO[k].addEventListener('canplaythrough', loadTick, { once:true });
+  SFX_AUDIO[k].addEventListener('error', loadTick);
+}
+setTimeout(assetsReady, 15000);                   // 兜底：15 秒后无论如何放行，防卡加载
 function playSfx(name){
   const arr = SFX_MAP[name]; if (!arr) return;
   const a = SFX_AUDIO[arr[randi(0, arr.length-1)]];
