@@ -70,6 +70,26 @@
   .dirbtn:active { background:rgba(255,216,101,.38); transform:scale(.94); }
   #btnL { left:24px; }
   #btnR { right:24px; }
+
+  /* 排行榜 */
+  .lb-bar { margin-top:16px; display:flex; gap:10px; align-items:center; }
+  .lb-bar input { width:220px; padding:10px 14px; font-size:15px; color:#f5e9d0;
+    background:rgba(20,14,8,.8); border:1px solid #6b5426; border-radius:10px;
+    outline:none; text-align:center; }
+  .lb-bar input:focus { border-color:#f5c542; }
+  .lb-list { width:min(370px, 88%); max-height:220px; overflow-y:auto; margin-top:12px;
+    border:1px solid #6b5426; border-radius:10px; padding:6px;
+    background:rgba(20,14,8,.55); }
+  .lb-row { display:flex; justify-content:space-between; gap:8px; padding:5px 8px;
+    font-size:13.5px; color:#d8c9a3; border-bottom:1px dashed rgba(107,84,38,.4); }
+  .lb-row:last-child { border-bottom:none; }
+  .lb-row span:nth-child(1){ width:36px; }
+  .lb-row span:nth-child(2){ flex:1; text-align:left; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .lb-row span:nth-child(3){ width:72px; text-align:right; color:#ffd865; }
+  .lb-row span:nth-child(4){ width:70px; text-align:right; }
+  .lb-row.lb-head { color:#a89a78; font-weight:bold; }
+  .lb-row.top1 { color:#ffd865; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -151,6 +171,12 @@
     <div class="go-title">壮士陨落</div>
     <div class="stats" id="finalStats"></div>
     <div class="best" id="bestStats"></div>
+    <div class="lb-bar">
+      <input id="lbName" maxlength="12" placeholder="输入名号（最多 12 字）">
+      <button class="btn" id="btnSubmitScore" style="margin-top:0; padding:10px 24px; font-size:16px; letter-spacing:2px;">提交榜单</button>
+    </div>
+    <div class="best" id="lbStatus"></div>
+    <div class="lb-list" id="lbList"></div>
     <button class="btn" id="btnRestart">再战江湖</button>
   </div>
 
@@ -547,6 +573,67 @@ function fireProjectile(e, small){
   sfxSpit();
 }
 
+// ================= 排行榜（Supabase，独立于合成大奶娃的表） =================
+const LB_URL   = 'https://znzncniwelbmkkdyuapz.supabase.co';
+const LB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpuem5jbml3ZWxibWtrZHl1YXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDU1MjAsImV4cCI6MjEwNjUyMTUyMH0.RR0A1TIUfxIz5Q1_OBKptazaltFI90hp56PSfmVGLl4';
+const LB_TABLE = 'gongfu_leaderboard';   // 与合成大奶娃的 bignaiwa 表完全分开
+let scoreSubmitted = false;
+
+function lbEscape(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function lbSubmit(){
+  if (scoreSubmitted) return;
+  const input = document.getElementById('lbName');
+  const name = (input.value.trim() || '无名之辈').slice(0, 12);
+  localStorage.setItem('gftn.name', name);
+  const btn = document.getElementById('btnSubmitScore');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    const res = await fetch(LB_URL + '/rest/v1/' + LB_TABLE, {
+      method: 'POST',
+      headers: {
+        'apikey': LB_KEY, 'Authorization': 'Bearer ' + LB_KEY,
+        'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ name, score, wave, kills })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    scoreSubmitted = true;
+    btn.textContent = '已上榜';
+    document.getElementById('lbStatus').textContent = '金榜题名！';
+    await lbLoad();
+  } catch (e){
+    btn.disabled = false; btn.textContent = '提交榜单';
+    document.getElementById('lbStatus').textContent = '提交失败，网络问题请稍后再试';
+  }
+}
+
+async function lbLoad(){
+  const box = document.getElementById('lbList');
+  box.innerHTML = '<div class="lb-row"><span>…</span><span>榜单加载中</span><span></span><span></span></div>';
+  try {
+    const res = await fetch(
+      LB_URL + '/rest/v1/' + LB_TABLE +
+      '?select=name,score,wave,kills&order=score.desc,created_at.asc&limit=10',
+      { headers: { 'apikey': LB_KEY, 'Authorization': 'Bearer ' + LB_KEY } }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    box.innerHTML = rows.length
+      ? '<div class="lb-row lb-head"><span>名次</span><span>名号</span><span>评分</span><span>波数</span></div>' +
+        rows.map((r, i) =>
+          `<div class="lb-row${i === 0 ? ' top1' : ''}">` +
+          `<span>${i + 1}</span><span>${lbEscape(r.name)}</span>` +
+          `<span>${r.score}</span><span>第 ${r.wave} 波</span></div>`).join('')
+      : '<div class="lb-row"><span>—</span><span>虚位以待，快来抢占第一名！</span><span></span><span></span></div>';
+  } catch (e){
+    box.innerHTML = '<div class="lb-row"><span>—</span><span>榜单加载失败，请稍后再试</span><span></span><span></span></div>';
+  }
+}
+document.getElementById('btnSubmitScore').onclick = lbSubmit;
+
 function gameOver(){
   state = 'gameover';
   playSfx('death');                       // 奶龙大笑
@@ -556,6 +643,13 @@ function gameOver(){
     `坚持到第 <b>${wave}</b> 波 · 击败 <b>${kills}</b> 名敌人<br>总评分 <b>${score}</b>`;
   document.getElementById('bestStats').textContent = `历史最佳评分：${best}`;
   document.getElementById('gameover').classList.remove('hidden');
+  // 排行榜：重置提交状态、回填上次的名号、拉取前 10 名
+  scoreSubmitted = false;
+  const btn = document.getElementById('btnSubmitScore');
+  btn.disabled = false; btn.textContent = '提交榜单';
+  document.getElementById('lbStatus').textContent = '';
+  document.getElementById('lbName').value = localStorage.getItem('gftn.name') || '';
+  lbLoad();
 }
 
 // ================= 输入 =================
