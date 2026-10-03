@@ -59,6 +59,17 @@
     overflow:hidden; margin-top:20px; background:#241a0e; }
   #lfill { height:100%; width:0%; background:linear-gradient(90deg,#f0a92c,#ffd865);
     transition:width .25s; border-radius:8px; }
+
+  /* 移动端左右方向按钮 */
+  .dirbtn { position:absolute; bottom:34px; width:94px; height:94px; border-radius:50%;
+    background:rgba(255,216,101,.16); border:2px solid rgba(245,197,66,.45);
+    color:#f5c542; font-size:38px; display:none; align-items:center; justify-content:center;
+    z-index:5; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+    touch-action:none; cursor:pointer; }
+  .dirbtn.show { display:flex; }
+  .dirbtn:active { background:rgba(255,216,101,.38); transform:scale(.94); }
+  #btnL { left:24px; }
+  #btnR { right:24px; }
 </style>
 </head>
 <body>
@@ -142,6 +153,10 @@
     <div class="best" id="bestStats"></div>
     <button class="btn" id="btnRestart">再战江湖</button>
   </div>
+
+  <!-- 移动端方向按钮 -->
+  <div id="btnL" class="dirbtn">◀</div>
+  <div id="btnR" class="dirbtn">▶</div>
 </div>
 
 <script>
@@ -552,6 +567,20 @@ addEventListener('keyup', ev => {
   if (ev.code === 'ArrowLeft'  || ev.code === 'KeyA') leftHeld  = false;
   if (ev.code === 'ArrowRight' || ev.code === 'KeyD') rightHeld = false;
 });
+
+// 移动端左右按钮：按住 = 持续出招 + 跑路（与键盘同通道），仅触屏设备显示
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch){
+  for (const [id, set] of [['btnL', v => leftHeld = v], ['btnR', v => rightHeld = v]]){
+    const b = document.getElementById(id);
+    b.classList.add('show');
+    b.addEventListener('pointerdown',   ev => { ev.preventDefault(); ac(); set(true); });
+    b.addEventListener('pointerup',     ev => { ev.preventDefault(); set(false); });
+    b.addEventListener('pointercancel', () => set(false));
+    b.addEventListener('pointerleave',  () => set(false));
+    b.addEventListener('contextmenu',   ev => ev.preventDefault());
+  }
+}
 
 document.getElementById('btnStart').onclick = () => {
   ac();
