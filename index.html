@@ -309,7 +309,7 @@ const ENEMY_TYPES = {
   boss: { img:'m6', face:'front', h:190, hp:750, spd:36,  dmg:32, reach:96, r:56, atkCD:1.4, kind:'slam'  }, // 大：巨蛙 BOSS
 };
 
-function spawnEnemy(type){
+function spawnEnemy(type, weak){
   const t = ENEMY_TYPES[type];
   // 10 波后额外血量爬坡（配合数量指数增长 = 超级难）
   const hpMul = 1 + (wave - 1) * .22 + (wave > 10 ? (wave - 10) * .12 : 0);
@@ -350,6 +350,11 @@ function spawnEnemy(type){
     e.hp *= 2; e.maxHp = e.hp;
     e.dmg *= 2; e.spd *= 2;
   }
+  // 双 BOSS 分身：各项属性比平时低 30%
+  if (weak){
+    e.hp *= .7; e.maxHp = e.hp;
+    e.dmg *= .7; e.spd *= .7;
+  }
   // ---- 金色精英（12 波起）：又肉又痛，评分翻倍 ----
   if (!e.isBoss && wave >= 12 && Math.random() < .08){
     e.elite = true;
@@ -376,7 +381,13 @@ function startWave(w){
   if (w >= 10) pool.push('frog','blob','doge','maid');
   if (bossWave){
     count = Math.ceil(count * .6);
-    pendingSpawns.push({ t: .8, type: 'boss' });
+    if (Math.random() < .35){
+      // 双 BOSS：两只分身，各比平时弱 30%
+      pendingSpawns.push({ t: .8,  type: 'boss', weak: true });
+      pendingSpawns.push({ t: 2.2, type: 'boss', weak: true });
+    } else {
+      pendingSpawns.push({ t: .8, type: 'boss' });
+    }
   }
   for (let i = 0; i < count; i++)
     pendingSpawns.push({ t: 1.2 + i * rand(.5, 1.0) * gap, type: pool[randi(0, pool.length-1)] });
@@ -915,7 +926,8 @@ function update(dt){
   // 刷怪
   for (const s of pendingSpawns) s.t -= dt;
   while (pendingSpawns.length && pendingSpawns[0].t <= 0){
-    spawnEnemy(pendingSpawns.shift().type);
+    const s = pendingSpawns.shift();
+    spawnEnemy(s.type, s.weak);
   }
 
   // ---- 敌人 AI（按攻击方式分流） ----
@@ -1208,17 +1220,19 @@ function render(){
     g.fillRect(0, 0, sw, H); g.fillRect(W - sw, 0, sw, H);
     g.strokeStyle = `rgba(200,40,30,${.55 * b})`; g.lineWidth = 3;
     g.strokeRect(sw, th, W - 2 * sw, H - 2 * th);
-    const bossAlive = enemies.find(e => e.isBoss && !e.dying && e.hp > 0);
-    if (bossAlive){
-      const bw2 = 340, bx2 = (W - bw2) / 2, by2 = th + 14;
-      g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(bx2 - 3, by2 - 3, bw2 + 6, 24);
-      g.fillStyle = '#2a0d0b'; g.fillRect(bx2, by2, bw2, 18);
-      const pg = g.createLinearGradient(bx2, 0, bx2 + bw2, 0);
-      pg.addColorStop(0, '#a01015'); pg.addColorStop(1, '#ff4a3a');
-      g.fillStyle = pg;
-      g.fillRect(bx2, by2, bw2 * Math.max(0, bossAlive.hp / bossAlive.maxHp), 18);
-      g.fillStyle = '#ffd865'; g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
-      g.fillText('巨蛙 BOSS', W / 2, by2 + 14);
+    const bosses = enemies.filter(e => e.isBoss && !e.dying && e.hp > 0).slice(0, 2);
+    if (bosses.length){
+      bosses.forEach((bb, i) => {
+        const bw2 = 340, bx2 = (W - bw2) / 2, by2 = th + 14 + i * 30;
+        g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(bx2 - 3, by2 - 3, bw2 + 6, 24);
+        g.fillStyle = '#2a0d0b'; g.fillRect(bx2, by2, bw2, 18);
+        const pg = g.createLinearGradient(bx2, 0, bx2 + bw2, 0);
+        pg.addColorStop(0, '#a01015'); pg.addColorStop(1, '#ff4a3a');
+        g.fillStyle = pg;
+        g.fillRect(bx2, by2, bw2 * Math.max(0, bb.hp / bb.maxHp), 18);
+        g.fillStyle = '#ffd865'; g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
+        g.fillText(bosses.length > 1 ? `巨蛙 BOSS · ${i === 0 ? '壹' : '贰'}` : '巨蛙 BOSS', W / 2, by2 + 14);
+      });
     }
   }
 
